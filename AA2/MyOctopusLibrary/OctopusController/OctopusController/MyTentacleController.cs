@@ -5,8 +5,6 @@ using System.Text;
 using UnityEngine;
 
 
-
-
 namespace OctopusController
 {
 
@@ -27,14 +25,50 @@ namespace OctopusController
         {
             tentacleMode = mode;
 
-            switch (tentacleMode){
+            List<Transform> joints = new List<Transform>();
+
+            switch (tentacleMode)
+            {
                 case TentacleMode.LEG:
+                    root = root.GetChild(0);
+                    joints.Add(root);
+                    while (root.transform.childCount != 0)
+                    {
+                        root = root.GetChild(1);
+                        joints.Add(root);
+                    }
+
+                    // Base of leg
+                    _endEffectorSphere = joints[0];
                     break;
+
                 case TentacleMode.TAIL:
+                    joints.Add(root);
+                    while (root.transform.childCount != 0)
+                    {
+                        root = root.GetChild(1);
+                        joints.Add(root);
+                    }
+
+                    // Red sphere
+                    _endEffectorSphere = joints[joints.Count - 1];
                     break;
+
                 case TentacleMode.TENTACLE:
+                    root = root.GetChild(0).transform.GetChild(0);
+                    while (root.transform.childCount != 0)
+                    {
+                        root = root.GetChild(0);
+                        joints.Add(root);
+                    }
+
+                    // Collider
+                    _endEffectorSphere = joints[joints.Count - 1];
                     break;
             }
+
+            _bones = joints.ToArray();
+
             return Bones;
         }
     }
