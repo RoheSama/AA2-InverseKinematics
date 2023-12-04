@@ -23,7 +23,6 @@ namespace OctopusController
 
         //variables
         private bool _startWalk = false;
-        private float _animRange;
         private float _animTime = 0;
 
         private Vector3[] _copy;
@@ -56,7 +55,7 @@ namespace OctopusController
         public void NotifyStartWalk()
         {
             _startWalk = true;
-            _animRange = 5;
+            animationRange = 5;
             _animTime = 0;
         }
 
@@ -70,7 +69,7 @@ namespace OctopusController
             if (_startWalk)
             {
                 _animTime += Time.deltaTime;
-                if (_animTime < _animRange)
+                if (_animTime < animationRange)
                 {
                     updateLegPos();
                 }
@@ -127,8 +126,47 @@ namespace OctopusController
             {
                 _distances[i] = Vector3.Distance(_legs[ID].Bones[i].position, _legs[ID].Bones[i + 1].position);
             }
+          
+            float targetRootDist = Vector3.Distance(_copy[0], legTargets[ID].position);
+           
+            if (targetRootDist < _distances.Sum())
+            {
+                while (Vector3.Distance(_copy[_copy.Length - 1], legTargets[ID].position) != 0 || Vector3.Distance(_copy[0], _legs[id].Bones[0].position) != 0)
+                {
+                    //Forward
+                    _copy[_copy.Length - 1] = legTargets[ID].position;
+                    for (int i = _legs[ID].Bones.Length - 2; i >= 0; i--)
+                    {
+                        Vector3 vecDir = GetDirNormalized(_copy[i + 1], _copy[i]);
+                        Vector3 moveVec = vecDir * _distances[i];
+                        _copy[i] = _copy[i + 1] - moveVec;
+                    }
+
+                    _copy[0] = _legs[ID].Bones[0].position;
+                    
+                    //Backward
+                    for (int i = 1; i < _legs[ID].Bones.Length - 1; i++)
+                    {
+                        Vector3 vecDir = GetDirNormalized(_copy[i - 1], _copy[i]);
+                        Vector3 moveVec = vecDir * _distances[i - 1];
+                        _copy[i] = _copy[i - 1] - moveVec;
+                    }
+                }
+
+                //Update rotations
+                for (int i = 0; i <= _legs[ID].Bones.Length - 2; i++)
+                {
+                    Vector3 direction = GetDirNormalized(_copy[i + 1], _copy[i]);
+                    Vector3 lastDir = GetDirNormalized(_legs[ID].Bones[i + 1].position, _legs[ID].Bones[i].position);
+                    Quaternion rot = Quaternion.FromToRotation(lastDir, direction);
+                    _legs[ID].Bones[i].rotation = rot * _legs[ID].Bones[i].rotation;
+                }
+            }
         }
-    
+        internal Vector3 GetDirNormalized(Vector3 vec1, Vector3 vec2)
+        {
+            return (vec1 - vec2).normalized;
+        }
         #endregion
     }
 }
