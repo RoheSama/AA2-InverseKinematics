@@ -131,7 +131,7 @@ namespace OctopusController
            
             if (targetRootDist < _distances.Sum())
             {
-                while (Vector3.Distance(_copy[_copy.Length - 1], legTargets[ID].position) != 0 || Vector3.Distance(_copy[0], _legs[id].Bones[0].position) != 0)
+                while (Vector3.Distance(_copy[_copy.Length - 1], legTargets[ID].position) != 0 || Vector3.Distance(_copy[0], _legs[ID].Bones[0].position) != 0)
                 {
                     //Forward
                     _copy[_copy.Length - 1] = legTargets[ID].position;
