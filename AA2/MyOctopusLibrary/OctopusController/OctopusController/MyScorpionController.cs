@@ -21,65 +21,151 @@ namespace OctopusController
         Transform[] legFutureBases;
         MyTentacleController[] _legs = new MyTentacleController[6];
 
-        
+        //variables
+        private bool _startWalk = false;
+        private float _animTime = 0;
+
+        private Vector3[] _copy;
+        private float[] _distances;
+
         #region public
         public void InitLegs(Transform[] LegRoots,Transform[] LegFutureBases, Transform[] LegTargets)
         {
             _legs = new MyTentacleController[LegRoots.Length];
-            //Legs init
+            
+            //Init
             for(int i = 0; i < LegRoots.Length; i++)
             {
                 _legs[i] = new MyTentacleController();
                 _legs[i].LoadTentacleJoints(LegRoots[i], TentacleMode.LEG);
-                //TODO: initialize anything needed for the FABRIK implementation
             }
-
         }
 
         public void InitTail(Transform TailBase)
         {
             _tail = new MyTentacleController();
             _tail.LoadTentacleJoints(TailBase, TentacleMode.TAIL);
-            //TODO: Initialize anything needed for the Gradient Descent implementation
         }
 
-        //TODO: Check when to start the animation towards target and implement Gradient Descent method to move the joints.
         public void NotifyTailTarget(Transform target)
         {
-
+            tailTarget = target;
         }
 
-        //TODO: Notifies the start of the walking animation
         public void NotifyStartWalk()
         {
-
+            _startWalk = true;
+            animationRange = 5;
+            _animTime = 0;
         }
-
-        //TODO: create the apropiate animations and update the IK from the legs and tail
 
         public void UpdateIK()
         {
- 
+            if (Vector3.Distance(tailEndEffector.transform.position, tailTarget.transform.position) > 0.05f)
+            {
+                updateTail();
+            }
+
+            if (_startWalk)
+            {
+                _animTime += Time.deltaTime;
+                if (_animTime < animationRange)
+                {
+                    updateLegPos();
+                }
+                else
+                {
+                    _startWalk = false;
+                }
+            }
         }
         #endregion
 
 
         #region private
-        //TODO: Implement the leg base animations and logic
+        internal float delta = 0.01f;
+
         private void updateLegPos()
         {
-            //check for the distance to the futureBase, then if it's too far away start moving the leg towards the future base position
-            //
+            //check for the distance to move leg
+            foreach (var leg in _legs)
+            {
+                if (Vector3.Distance(leg.Bones[0].position, legFutureBases[Array.IndexOf(_legs, leg)].position) > 1f)
+                {
+                    leg.Bones[0].position = Vector3.Lerp(leg.Bones[0].position, legFutureBases[Array.IndexOf(_legs, leg)].position, 1.4f);
+                }
+                updateLegs(Array.IndexOf(_legs, leg));
+            }
         }
-        //TODO: implement Gradient Descent method to move tail if necessary
+       
         private void updateTail()
         {
+            Vector3.Lerp(tailEndEffector.transform.position, tailTarget.transform.position, 1f);
+            for (int i = 0; i < _tail.Bones.Length - 2; i++)
+            {
+                float distEndEffectorToTarget = Vector3.Distance(tailEndEffector.transform.position, tailTarget.transform.position);
+                _tail.Bones[i].transform.Rotate(Vector3.forward * delta);
+                float tempDistEndToTarget = Vector3.Distance(tailEndEffector.transform.position, tailTarget.transform.position);
+                _tail.Bones[i].transform.Rotate(Vector3.forward * -delta);
+                float _slope = (tempDistEndToTarget - distEndEffectorToTarget) / delta;
 
+                _tail.Bones[i].transform.Rotate((Vector3.forward * -_slope) * 120f);
+            }
         }
-        //TODO: implement fabrik method to move legs 
-        private void updateLegs()
+       
+        private void updateLegs(int ID)
         {
+            //Make copy
+            for (int i = 0; i <= _legs[0].Bones.Length - 1; i++)
+            {
+                _copy[i] = _legs[ID].Bones[i].position;
+            }
 
+            //Bones distances
+            for (int i = 0; i <= _legs[ID].Bones.Length - 2; i++)
+            {
+                _distances[i] = Vector3.Distance(_legs[ID].Bones[i].position, _legs[ID].Bones[i + 1].position);
+            }
+          
+            float targetRootDist = Vector3.Distance(_copy[0], legTargets[ID].position);
+           
+            if (targetRootDist < _distances.Sum())
+            {
+                while (Vector3.Distance(_copy[_copy.Length - 1], legTargets[ID].position) != 0 || Vector3.Distance(_copy[0], _legs[ID].Bones[0].position) != 0)
+                {
+                    //Forward
+                    _copy[_copy.Length - 1] = legTargets[ID].position;
+                    for (int i = _legs[ID].Bones.Length - 2; i >= 0; i--)
+                    {
+                        Vector3 vecDir = GetDirNormalized(_copy[i + 1], _copy[i]);
+                        Vector3 moveVec = vecDir * _distances[i];
+                        _copy[i] = _copy[i + 1] - moveVec;
+                    }
+
+                    _copy[0] = _legs[ID].Bones[0].position;
+                    
+                    //Backward
+                    for (int i = 1; i < _legs[ID].Bones.Length - 1; i++)
+                    {
+                        Vector3 vecDir = GetDirNormalized(_copy[i - 1], _copy[i]);
+                        Vector3 moveVec = vecDir * _distances[i - 1];
+                        _copy[i] = _copy[i - 1] - moveVec;
+                    }
+                }
+
+                //Update rotations
+                for (int i = 0; i <= _legs[ID].Bones.Length - 2; i++)
+                {
+                    Vector3 direction = GetDirNormalized(_copy[i + 1], _copy[i]);
+                    Vector3 lastDir = GetDirNormalized(_legs[ID].Bones[i + 1].position, _legs[ID].Bones[i].position);
+                    Quaternion rot = Quaternion.FromToRotation(lastDir, direction);
+                    _legs[ID].Bones[i].rotation = rot * _legs[ID].Bones[i].rotation;
+                }
+            }
+        }
+        internal Vector3 GetDirNormalized(Vector3 vec1, Vector3 vec2)
+        {
+            return (vec1 - vec2).normalized;
         }
         #endregion
     }
