@@ -17,8 +17,8 @@ namespace OctopusController
         float animationRange;
 
         //LEGS
-        Transform[] legTargets;
-        Transform[] legFutureBases;
+        Transform[] legTargets = new Transform[6];
+        Transform[] legFutureBases = new Transform[6];
         MyTentacleController[] _legs = new MyTentacleController[6];
 
         //variables
@@ -38,13 +38,20 @@ namespace OctopusController
             {
                 _legs[i] = new MyTentacleController();
                 _legs[i].LoadTentacleJoints(LegRoots[i], TentacleMode.LEG);
+
+                legFutureBases[i] = LegFutureBases[i];
+                legTargets[i] = LegTargets[i];
             }
+            _distances = new float[_legs[0].Bones.Length - 1];
+            _copy = new Vector3[_legs[0].Bones.Length];
         }
 
         public void InitTail(Transform TailBase)
         {
             _tail = new MyTentacleController();
             _tail.LoadTentacleJoints(TailBase, TentacleMode.TAIL);
+
+            tailEndEffector = _tail.Bones[_tail.Bones.Length - 1];
         }
 
         public void NotifyTailTarget(Transform target)
