@@ -17,8 +17,8 @@ namespace OctopusController
         float animationRange;
 
         //LEGS
-        Transform[] legTargets;
-        Transform[] legFutureBases;
+        Transform[] legTargets = new Transform[6];
+        Transform[] legFutureBases = new Transform[6];
         MyTentacleController[] _legs = new MyTentacleController[6];
 
         //variables
@@ -38,13 +38,20 @@ namespace OctopusController
             {
                 _legs[i] = new MyTentacleController();
                 _legs[i].LoadTentacleJoints(LegRoots[i], TentacleMode.LEG);
+
+                legFutureBases[i] = LegFutureBases[i];
+                legTargets[i] = LegTargets[i];
             }
+            _distances = new float[_legs[0].Bones.Length - 1];
+            _copy = new Vector3[_legs[0].Bones.Length];
         }
 
         public void InitTail(Transform TailBase)
         {
             _tail = new MyTentacleController();
             _tail.LoadTentacleJoints(TailBase, TentacleMode.TAIL);
+
+            tailEndEffector = _tail.Bones[_tail.Bones.Length - 1];
         }
 
         public void NotifyTailTarget(Transform target)
@@ -95,6 +102,8 @@ namespace OctopusController
                     leg.Bones[0].position = Vector3.Lerp(leg.Bones[0].position, legFutureBases[Array.IndexOf(_legs, leg)].position, 1.4f);
                 }
                 updateLegs(Array.IndexOf(_legs, leg));
+
+                updateLegsFABRIK(Array.IndexOf(_legs, leg));
             }
         }
        
@@ -163,6 +172,78 @@ namespace OctopusController
                 }
             }
         }
+
+        private void FABRIKIK(Transform[] bones, Vector3 target)
+        {
+            int numBones = bones.Length;
+            Vector3[] positions = new Vector3[numBones];
+            float[] distances = new float[numBones - 1];
+            for (int i = 0; i < numBones; i++)
+            {
+                positions[i] = bones[i].position;
+                if (i < numBones - 1)
+                {
+                    distances[i] = Vector3.Distance(positions[i], positions[i + 1]);
+                }
+            }
+
+            // Total distance
+            float totalDistance = distances.Sum();
+
+            if (Vector3.Distance(positions[0], target) < totalDistance)
+            {
+                for (int iteration = 0; iteration < 50; iteration++)
+                {
+                    // Backward
+                    positions[numBones - 1] = target;
+                    for (int i = numBones - 2; i >= 0; i--)
+                    {
+                        Vector3 direction = GetDirNormalized(positions[i + 1], positions[i]);
+                        positions[i] = positions[i + 1] - direction * distances[i];
+                    }
+
+                    // Forward
+                    positions[0] = bones[0].position;
+                    for (int i = 1; i < numBones; i++)
+                    {
+                        Vector3 direction = GetDirNormalized(positions[i - 1], positions[i]);
+                        positions[i] = positions[i - 1] + direction * distances[i - 1];
+                    }
+
+                    if (Vector3.Distance(positions[numBones - 1], target) < 0.1f)
+                    {
+                        break;
+                    }
+                }
+
+                for (int i = 0; i < numBones; i++)
+                {
+                    bones[i].position = positions[i];
+                }
+            }
+        }
+
+        private void updateLegsFABRIK(int ID)
+        {
+            // verify distance
+            float distanceToMove = Vector3.Distance(_legs[ID].Bones[0].position, legFutureBases[Array.IndexOf(_legs, _legs[ID])].position);
+
+            if (distanceToMove > 1f)
+            {
+                Vector3 targetPosition = legFutureBases[Array.IndexOf(_legs, _legs[ID])].position;
+
+                FABRIKIK(_legs[ID].Bones, targetPosition);
+
+                // Update rotations
+                for (int i = 0; i <= _legs[ID].Bones.Length - 2; i++)
+                {
+                    Vector3 direction = GetDirNormalized(_legs[ID].Bones[i + 1].position, _legs[ID].Bones[i].position);
+                    Quaternion rotation = Quaternion.FromToRotation(_legs[ID].Bones[i + 1].forward, direction);
+                    _legs[ID].Bones[i].rotation = rotation * _legs[ID].Bones[i].rotation;
+                }
+            }
+        }
+
         internal Vector3 GetDirNormalized(Vector3 vec1, Vector3 vec2)
         {
             return (vec1 - vec2).normalized;
